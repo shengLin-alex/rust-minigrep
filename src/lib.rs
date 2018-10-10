@@ -22,28 +22,15 @@ use std::io::prelude::*; // 內部定義許多 I/O 相關的 trait
 ///
 /// 參數型別必須為 &str, 因為編譯器無法在編譯時期得知 str 長度
 pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
-    let mut resutls: Vec<&str> = Vec::new();
-
-    for line in contents.lines() {
-        if line.contains(query) {
-            resutls.push(line);
-        }
-    }
-
-    resutls
+    contents.lines()
+        .filter(|line| line.contains(query))
+        .collect()
 }
 
 pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
-    let mut results: Vec<&str> = Vec::new();
-
-    for line in contents.lines() {
-        // to_uppercase() & to_lowercase() 回傳轉換後的 String, 不會修改原本的變數 ref
-        if line.to_uppercase().contains(&query.to_uppercase()) {
-            results.push(line);
-        }
-    }
-
-    results
+    contents.lines() // why &query.to_uppercase(), 因為 contains 要吃 sub slice of str.
+        .filter(|line| line.to_uppercase().contains(&query.to_uppercase()))
+        .collect()
 }
 
 pub fn run(config: Config) -> Result<(), Box<Error>> {
@@ -77,7 +64,7 @@ pub struct Config {
 impl Config {
     /// Constructor
     /// 重構 parse_config 為構造函數
-    pub fn new(args: &[String]) -> Result<Config, &'static str> {
+    pub fn new(mut args: std::env::Args) -> Result<Config, &'static str> {
         if args.len() < 3 {
             // panic!("Not enough arguments.");
             // 直接 panic 並不是最好的
@@ -85,9 +72,18 @@ impl Config {
             return Err("Not enough arguments.");
         }
 
-        // 此處使用 clone, 犧牲小部份效能, 換取程式碼簡潔
-        let query: String = args[1].clone();
-        let filename: String = args[2].clone();
+        // skip first, 第一個為主程式名稱.
+        args.next();
+
+        // 將原本使用 clone 修改成 iter.next() 來迭代到我們要求的參數
+        let query: String = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get a query string."),
+        };
+        let filename: String = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get a file name."),
+        };
 
         let is_case_sensitive: bool = env::var("CASE_INSENSITIVE").is_err();
 
